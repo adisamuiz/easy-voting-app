@@ -1,4 +1,4 @@
-//import {useNavigate} from "react-router-dom";
+import {useNavigate} from "react-router-dom";
 import {useState, useEffect} from "react";
 import {db, auth} from "../../firebase";  
 import { doc, getDoc, collection, getDocs, runTransaction, increment } from "firebase/firestore";  
@@ -8,44 +8,16 @@ import ProgressBar from "../components/ProgressBar";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 
 function VotingPage() {
-    //const navigate = useNavigate()
+    const navigate = useNavigate();
     const [totalPositions, setTotalPositions] = useState(0);
     const [positionsVoted, setPositionsVoted] = useState(0);
     const [positions, setPositions] = useState([]);
     const [candidates, setCandidates] = useState([]);
     const [userUid, setUserUid] = useState(""); // Store the authenticated user's UID   
+    const [votes, setVotes] = useState({}); // Store the votes for each candidate
 
     const currentPosition = positions[positionsVoted];
 
-    const handleNext = () => {
-        if (positionsVoted < totalPositions) {
-            setPositionsVoted(positionsVoted + 1);   
-        }
-    };
-    const handleClick = async() => {
-        const candidateRef = doc(db, "candidates", "EI4kyGVPkow9KCpvzRhk"); // Replace with actual candidate ID
-        const userRef = doc(db, "users", userUid); // Replace with actual user ID
-        try {
-            await runTransaction(db, async (transaction) => {
-                const candidateDoc = await transaction.get(candidateRef);
-                const userDoc = await transaction.get(userRef);
-                if (!candidateDoc.exists()) {
-                    throw "Candidate does not exist!";
-                }
-                if (!userDoc.exists()) {
-                    throw "User does not exist!";
-                }
-                if (userDoc.data().hasVoted) {
-                    throw "User has already voted!";
-                }
-                transaction.update(candidateRef, { votes: increment(1) });
-                transaction.update(userRef, { hasVoted: true });
-            });
-        }
-        catch (error) {
-            console.error("Transaction failed: ", error);
-        }
-    }
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
             if (user) {
@@ -61,9 +33,9 @@ function VotingPage() {
         
         const fetchPositionData = async () => {
             try {
-                const positionRef = await doc(db, "Elections", "eee-2026");
-                const positionSnap = await getDoc(positionRef);
-                const positionList = positionSnap.data().positions;
+                const electionRef = await doc(db, "Elections", "eee-2026");
+                const electionSnap = await getDoc(electionRef);
+                const positionList = electionSnap.data().positions;
                 console.log("positionList:" , positionList);
                 setTotalPositions(positionList.length);
                 setPositions(positionList);
@@ -78,7 +50,7 @@ function VotingPage() {
                 const candidateSnapshot = await getDocs(candidateCollection);
                 const candidateList = candidateSnapshot.docs.map((doc) => ({id: doc.id, ...doc.data()}));
                 setCandidates(candidateList);
-                console.log("candidates:" , candidates);
+                console.log("candidates:" , candidateList);
             } catch (error) {
                 console.error("Error fetching candidate data: ", error);
             }
@@ -88,13 +60,68 @@ function VotingPage() {
         fetchCandidateData();
         return () => unsubscribe();
     } , []);
+
+    const handleNext = () => {
+        if (positionsVoted < totalPositions) {
+            setPositionsVoted(positionsVoted + 1);   
+        } else {
+            //console.log("Votes: ", votes);
+            handleSubmit();
+        }
+    };
+    const handleClick = (candidate) => {
+        setVotes((prev) => ({
+            ...prev,
+            [candidate.position]: candidate.id,
+        }));
+        console.log("Votes: ", votes);
+    }
+    const handleSubmit = async() => {
+        try {
+            const userRef = doc(db, "users", userUid); // Replace with actual user ID
+            const candidateRefList = [];
+            await runTransaction(db, async (transaction) => {
+                const userDoc = await transaction.get(userRef);
+                if (!userDoc.exists()) {
+                    throw "User does not exist!";
+                }
+                if (userDoc.data().hasVoted) {
+                    throw "User has already voted!";
+                }
+                for (const candidateId of Object.values(votes)) {
+                    const candidateRef = doc(db, "candidates", candidateId);
+                    const candidateDoc = await transaction.get(candidateRef);
+                    if (!candidateDoc.exists()) {
+                        throw "Candidate does not exist!";
+                    }
+                    candidateRefList.push(candidateRef);
+                }
+                for (const ref of candidateRefList) {
+                    transaction.update(ref, { votes: increment(1) });
+                }
+                transaction.update(userRef, { hasVoted: true });
+            });
+        }
+        catch (error) {
+            console.error("Transaction failed: ", error);
+        }
+    }
+    const handleSignOut = () => {
+        signOut(auth);
+        navigate("/");
+    };
     return (
         <>
         <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex flex-col">
             <header className="sticky top-0 z-50 bg-white shadow-sm">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+                <div className="flex justify-between max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
                     <div className="flex items-center gap-3">
                         <h1 className="text-2xl font-bold text-gray-900">VoltEE</h1>
+                    </div>
+                    <div>
+                        <button onClick={handleSignOut} className="bg-red-500 text-white py-2 px-4 rounded-lg hover:bg-red-600 transition-colors">
+                            Sign Out
+                        </button>
                     </div>
                 </div>
                 <div>
@@ -117,7 +144,7 @@ function VotingPage() {
                                 id={candidate.id}
                                 candidateName={candidate.name}
                                 candidatePosition={candidate.position}
-                                onClick={handleClick}
+                                onClick={() => handleClick(candidate)}
                             /> : null
                         ))}
                     </div>

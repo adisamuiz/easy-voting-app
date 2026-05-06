@@ -7,11 +7,6 @@ import ElectionCard from "../components/ElectionCard";
 function Home() {
   const navigate = useNavigate()
   const [elections, setElections] = useState([]);
-  const handleClick = () => {
-    
-    // Navigate to a new route
-    navigate("/voter-login");
-  };
   useEffect(() => {
     const fetchElections = async () => {
       try {
@@ -26,6 +21,9 @@ function Home() {
     };
     fetchElections();
   }, []);
+  const handleClick = (electionId) => {
+    navigate(`/voter-login/${electionId}`);
+  };
   return (
   <>
   <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex flex-col">
@@ -46,7 +44,7 @@ function Home() {
           {elections.map((election) => (
             <ElectionCard 
               id={election.id}
-              onClick={handleClick}
+              onClick={() => handleClick(election.id)}
               className="bg-white text-card-foreground flex flex-col gap-6 rounded-2xl space-y-4 cursor-pointer hover:shadow-lg transition-all border-2 border-gray-300 hover:border-green-500"
               electionTitle={election.title}
               positions={election.positions.length + " positions available"}

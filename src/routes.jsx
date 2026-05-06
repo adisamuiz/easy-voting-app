@@ -9,7 +9,7 @@ export const router = createBrowserRouter([
     Component: Home,
   },
   {
-    path: '/voter-login',
+    path: '/voter-login/:electionId',
     Component: VoterLogin,
   },
   {

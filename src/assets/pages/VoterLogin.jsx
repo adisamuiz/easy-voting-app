@@ -1,15 +1,17 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { db } from "../../firebase";
 import {auth} from "../../firebase";
 import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 
 function VoterLogin() {
+  const { electionId } = useParams();
   const [studentEmail, setStudentEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [electionTitle, setElectionTitle] = useState("");
   const navigate = useNavigate();
   
   useEffect(() => {
@@ -17,7 +19,11 @@ function VoterLogin() {
         if (user) {
             const userDoc = doc(db, "users", user.uid);
             const docSnap = await getDoc(userDoc);
-            if (docSnap.exists() &&  docSnap.data().role === "voter") {
+            if (
+                docSnap.exists() && 
+                docSnap.data().role === "voter" &&
+                docSnap.data().electionId === electionId) 
+            {
                 navigate("/voting");
             } else {
                 setError("Unauthorized access. Only voters can log in.");
@@ -25,8 +31,24 @@ function VoterLogin() {
             }
         }
     }); 
+    const fetchElectionData = async () => {
+        try {
+            const electionRef = doc(db, "Elections", electionId);
+            const electionDoc = await getDoc(electionRef);
+            if (electionDoc.exists()) {
+                const electionData = electionDoc.data();
+                setElectionTitle(electionData.title);
+            } else {
+                setError("Election not found. Please check the link and try again.");
+            }
+        } catch (err) {
+            console.error("Error fetching election data:", err);
+            setError("An error occurred while fetching election data. Please try again later.");
+        }
+    }
+    fetchElectionData();
     return () => unsubscribe();
-  }, [navigate]);
+  }, [navigate, electionId]);
 
   const handleGoogleLogin = async () => {
     const provider = new GoogleAuthProvider();
@@ -74,7 +96,7 @@ function VoterLogin() {
         <main className ="flex-1 flex items-center justify-center p-4">
             <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8">
                 <h2 className="text-2xl text-center">Voter Authentication</h2>
-                <p className="text-sm text-gray-600 text-center mt-2">positions available</p>
+                <p className="text-sm text-gray-600 text-center mt-2">{electionTitle}</p>
                 {error && (
                     <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
                         {error}
@@ -128,7 +150,7 @@ function VoterLogin() {
                     </input>
                     <button 
                         className= "w-full bg-green-900 hover:bg-green-800 text-white font-semibold py-3 rounded-lg shadow-lg hover:shadow-cyan-500/20 transition-all active:scale-[0.98]"
-                        diabled = {loading}
+                        disabled = {loading}
                         type = "submit"
                     >
                         {loading ? "Signing in..." : "Sign In"}
