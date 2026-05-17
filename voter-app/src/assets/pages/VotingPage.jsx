@@ -2,7 +2,6 @@ import {useNavigate} from "react-router-dom";
 import {useState, useEffect} from "react";
 import {db, auth} from "../../firebase";  
 import { doc, getDoc, collection, getDocs, runTransaction, increment } from "firebase/firestore";  
-
 import CandidateCard from "../components/candidateCard";
 import ProgressBar from "../components/ProgressBar"; 
 import { onAuthStateChanged, signOut } from "firebase/auth";
